@@ -242,6 +242,8 @@ int fixTwoBitsErrors(unsigned char *msg, int bits);
 int modesMessageLenByType(int type);
 void sigWinchCallback();
 int getTermRows();
+void writeIQ2FileByICAO(struct aircraft* aircraft, unsigned char* iq_data,
+                   uint32_t iq_data_len, char* data_dir);
 
 /* ============================= Utility functions ========================== */
 
@@ -2416,6 +2418,56 @@ void modesWaitReadableClients(int timeout_ms) {
      * FDs ready are all conditions for which we just return. */
     select(maxfd+1,&fds,NULL,NULL,&tv);
 }
+
+void writeIQ2FileByICAO(struct aircraft* ac, unsigned char* iq_data,
+                   uint32_t iq_data_len, char* data_dir)
+{
+
+   char directory_path[1024];
+   char filename[64];
+
+   snprintf(filename, sizeof(filename), "%s_%lld.bin", ac->flight, mstime());
+
+   snprintf(directory_path, sizeof(directory_path), "%s/%s", data_dir,
+            ac->hexaddr);
+
+   struct stat st = {0};
+   if (stat(data_dir, &st) == -1)
+   {
+      if (mkdir(data_dir, 0777) != 0)
+      {
+         printf("ERROR: making directory '%s'\n", data_dir);
+         return;
+      }
+   }
+
+   if (stat(directory_path, &st) == -1)
+   {
+      if (mkdir(directory_path, 0777) != 0)
+      {
+         printf("ERROR: making directory '%s'\n", directory_path);
+         return;
+      }
+   }
+
+   FILE* file_ptr;
+   char full_file_path[sizeof(directory_path)+sizeof(filename)];
+   snprintf(full_file_path, sizeof(full_file_path), "%s/%s", directory_path, filename);
+   file_ptr = fopen(full_file_path, "wb");
+
+   if (file_ptr == NULL)
+   {
+      printf("ERROR: opening file '%s'\n", full_file_path);
+      return;
+   }
+   else
+   {
+      fwrite(iq_data, iq_data_len, 1, file_ptr);
+   }
+
+   fclose(file_ptr);
+}
+
 
 /* ============================ Terminal handling  ========================== */
 
