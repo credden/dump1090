@@ -292,7 +292,7 @@ void modesInit(void) {
      * in the message detection loop, back at the start of the next data
      * to process. This way we are able to also detect messages crossing
      * two reads. */
-    Modes.data_len = MODES_DATA_LEN + (MODES_FULL_LEN-1)*4;
+    Modes.data_len = ceil((MODES_DATA_LEN + (MODES_FULL_LEN-1))*((double)Modes.sample_rate/MODES_DEFAULT_RATE))*4;
     Modes.data_ready = 0;
     /* Allocate the ICAO address cache. We use two uint32_t for every
      * entry because it's a addr / timestamp pair for every entry. */
@@ -301,7 +301,7 @@ void modesInit(void) {
     Modes.aircrafts = NULL;
     Modes.interactive_last_update = 0;
     if ((Modes.data = malloc(Modes.data_len)) == NULL ||
-        (Modes.magnitude = malloc(Modes.data_len*2)) == NULL) {
+        (Modes.magnitude = malloc(MODES_DATA_LEN + (MODES_FULL_LEN-1)*4*2)) == NULL) {
         fprintf(stderr, "Out of memory allocating data buffer.\n");
         exit(1);
     }
@@ -1251,17 +1251,21 @@ void displayModesMessage(struct modesMessage *mm) {
 void computeMagnitudeVector(void) {
     uint16_t *m = Modes.magnitude;
     unsigned char *p = Modes.data;
-    uint32_t j;
+    double samples_per_pulse = (double)Modes.sample_rate/MODES_DEFAULT_RATE;
+    uint32_t j,jj;
+
 
     /* Compute the magnitudo vector. It's just SQRT(I^2 + Q^2), but
      * we rescale to the 0-255 range to exploit the full resolution. */
-    for (j = 0; j < Modes.data_len; j += 2) {
-        int i = p[j]-127;
-        int q = p[j+1]-127;
+    jj = 0;
+    for (j = 0; j < Modes.data_len; j++) {
+        jj = ceil(j*samples_per_pulse)*2;
+        int i = p[jj]-127;
+        int q = p[jj+1]-127;
 
         if (i < 0) i = -i;
         if (q < 0) q = -q;
-        m[j/2] = Modes.maglut[i*129+q];
+        m[j] = Modes.maglut[i*129+q];
     }
 }
 
@@ -2496,7 +2500,7 @@ void showHelp(void) {
 "--gain <db>              Set gain (default: max gain. Use -100 for auto-gain).\n"
 "--enable-agc             Enable the Automatic Gain Control (default: off).\n"
 "--freq <hz>              Set frequency (default: 1090 Mhz).\n"
-"--sample-rate <hz>       Set sample rate (default: 2000000 samples/second).\n"
+"--sample-rate <hz>       Set sample rate (default/minimum): 2000000 samples/second).\n"
 "--ifile <filename>       Read data from file (use '-' for stdin).\n"
 "--loop                   With --ifile, read the same file in a loop.\n"
 "--interactive            Interactive mode refreshing data on screen.\n"
@@ -2570,6 +2574,9 @@ int main(int argc, char **argv) {
             Modes.freq = strtoll(argv[++j],NULL,10);
         } else if (!strcmp(argv[j],"--sample-rate") && more) {
             Modes.sample_rate = strtoll(argv[++j],NULL,10);
+            if (Modes.sample_rate < MODES_DEFAULT_RATE) {
+                Modes.sample_rate = MODES_DEFAULT_RATE;
+            }
         } else if (!strcmp(argv[j],"--ifile") && more) {
             Modes.filename = strdup(argv[++j]);
         } else if (!strcmp(argv[j],"--loop")) {
