@@ -245,6 +245,7 @@ void sigWinchCallback();
 int getTermRows();
 void writeIQ2FileByICAO(struct aircraft* aircraft, unsigned char* iq_data,
                    uint32_t iq_data_len, char* data_dir);
+uint16_t interpolate(uint16_t* vec, double index);
 
 /* ============================= Utility functions ========================== */
 
@@ -1252,22 +1253,34 @@ void computeMagnitudeVector(void) {
     uint16_t *m = Modes.magnitude;
     unsigned char *p = Modes.data;
     double samples_per_pulse = (double)Modes.sample_rate/MODES_DEFAULT_RATE;
-    uint32_t j,jj;
+    uint16_t mags[Modes.data_len/2];
+    uint32_t j;
 
 
     /* Compute the magnitudo vector. It's just SQRT(I^2 + Q^2), but
      * we rescale to the 0-255 range to exploit the full resolution. */
-    jj = 0;
-    for (j = 0; j < Modes.data_len; j++) {
-        jj = ceil(j*samples_per_pulse)*2;
-        int i = p[jj]-127;
-        int q = p[jj+1]-127;
+    for (j = 0; j < Modes.data_len; j+=2) {
+        int i = p[j]-127;
+        int q = p[j+1]-127;
 
         if (i < 0) i = -i;
         if (q < 0) q = -q;
-        m[j] = Modes.maglut[i*129+q];
+        mags[j/2] = Modes.maglut[i*129+q];
+    }
+
+    for (j = 0; j*samples_per_pulse < Modes.data_len/2; j++) {
+        m[j] = interpolate(mags, j*samples_per_pulse);
     }
 }
+
+
+uint16_t interpolate(uint16_t* vec, double index)
+{
+   uint16_t lower = vec[(int)index];
+   uint16_t upper = vec[(int)index];
+   return (upper-lower)*(index-floor(index))+lower;
+}
+
 
 /* Return -1 if the message is out of fase left-side
  * Return  1 if the message is out of fase right-size
