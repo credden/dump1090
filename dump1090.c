@@ -93,6 +93,7 @@
 
 #define MODES_NOTUSED(V) ((void) V)
 
+
 /* Structure used to describe a networking client. */
 struct client {
     int fd;         /* File descriptor. */
@@ -245,7 +246,7 @@ void sigWinchCallback();
 int getTermRows();
 void writeIQ2FileByICAO(struct aircraft* aircraft, unsigned char* iq_data,
                    uint32_t iq_data_len, char* data_dir);
-uint16_t interpolate(uint16_t* vec, double index);
+uint16_t interpolate(uint16_t* vec, uint16_t, double index);
 
 /* ============================= Utility functions ========================== */
 
@@ -1269,16 +1270,40 @@ void computeMagnitudeVector(void) {
     }
 
     for (j = 0; j*samples_per_pulse < Modes.data_len/2; j++) {
-        m[j] = interpolate(mags, j*samples_per_pulse);
+        m[j] = interpolate(mags, j!=0?m[j-1]:0,j*samples_per_pulse);
     }
 }
 
+#define EPSILON 0.1
 
-uint16_t interpolate(uint16_t* vec, double index)
+uint16_t interpolate(uint16_t* vec, uint16_t prev_value, double index)
 {
-   uint16_t lower = vec[(int)index];
-   uint16_t upper = vec[(int)index];
-   return (upper-lower)*(index-floor(index))+lower;
+    /* If we're within the margin of an actual index, choose that index */
+    if (index - (int)index < EPSILON)
+    {
+        return vec[(int)index];
+    }
+    else if (index - (int)index > 1 - EPSILON)
+    {
+        return vec[(int)index + 1];
+    }
+    /* If not within the margin of an actual index, choose the index whose
+     * magnitude is furthest from the previously used magnitude */
+    else
+    {
+        uint16_t lower = vec[(int)index];
+        uint16_t upper = vec[(int)index+1];
+        int lower_diff = abs((int)lower - (int)prev_value);
+        int upper_diff = abs((int)upper - (int)prev_value);
+        if (upper_diff > lower_diff)
+        {
+            return vec[(int)index+1];
+        }
+        else
+        {
+            return vec[(int)index];
+        }
+    }
 }
 
 
