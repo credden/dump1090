@@ -289,7 +289,7 @@ void modesInit(void) {
      * in the message detection loop, back at the start of the next data
      * to process. This way we are able to also detect messages crossing
      * two reads. */
-    Modes.data_len = ceil((MODES_DATA_LEN + (MODES_FULL_LEN-1))*((double)Modes.sample_rate/MODES_DEFAULT_RATE))*4;
+    Modes.data_len = MODES_DATA_LEN + (MODES_FULL_LEN-1)*4;
     Modes.data_ready = 0;
     /* Allocate the ICAO address cache. We use two uint32_t for every
      * entry because it's a addr / timestamp pair for every entry. */
@@ -298,7 +298,7 @@ void modesInit(void) {
     Modes.aircrafts = NULL;
     Modes.interactive_last_update = 0;
     if ((Modes.data = malloc(Modes.data_len)) == NULL ||
-        (Modes.magnitude = malloc(MODES_DATA_LEN + (MODES_FULL_LEN-1)*4*2)) == NULL) {
+        (Modes.magnitude = malloc(Modes.data_len*2)) == NULL) {
         fprintf(stderr, "Out of memory allocating data buffer.\n");
         exit(1);
     }
@@ -1248,24 +1248,17 @@ void displayModesMessage(struct modesMessage *mm) {
 void computeMagnitudeVector(void) {
     uint16_t *m = Modes.magnitude;
     unsigned char *p = Modes.data;
-    double samples_per_pulse = (double)Modes.sample_rate/MODES_DEFAULT_RATE;
-    uint16_t mags[Modes.data_len/2];
     uint32_t j;
-
 
     /* Compute the magnitudo vector. It's just SQRT(I^2 + Q^2), but
      * we rescale to the 0-255 range to exploit the full resolution. */
-    for (j = 0; j < Modes.data_len; j+=2) {
+    for (j = 0; j < Modes.data_len; j += 2) {
         int i = p[j]-127;
         int q = p[j+1]-127;
 
         if (i < 0) i = -i;
         if (q < 0) q = -q;
-        mags[j/2] = Modes.maglut[i*129+q];
-    }
-
-    for (j = 0; j*samples_per_pulse < Modes.data_len/2; j++) {
-        m[j] = interpolate(mags, j!=0?m[j-1]:0,j*samples_per_pulse);
+        m[j/2] = Modes.maglut[i*129+q];
     }
 }
 
