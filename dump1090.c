@@ -93,7 +93,6 @@
 
 #define MODES_NOTUSED(V) ((void) V)
 
-
 /* Structure used to describe a networking client. */
 struct client {
     int fd;         /* File descriptor. */
@@ -1260,11 +1259,6 @@ void computeMagnitudeVector(void) {
         if (q < 0) q = -q;
         m[j/2] = Modes.maglut[i*129+q];
     }
-}
-
-uint16_t interpolate(uint16_t* vec, uint16_t prev_value, double index)
-{
-    return vec[(int)(index+0.5)];
 }
 
 /* Return -1 if the message is out of fase left-side
