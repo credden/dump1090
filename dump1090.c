@@ -1262,38 +1262,10 @@ void computeMagnitudeVector(void) {
     }
 }
 
-#define EPSILON 0.1
-
 uint16_t interpolate(uint16_t* vec, uint16_t prev_value, double index)
 {
-    /* If we're within the margin of an actual index, choose that index */
-    if (index - (int)index < EPSILON)
-    {
-        return vec[(int)index];
-    }
-    else if (index - (int)index > 1 - EPSILON)
-    {
-        return vec[(int)index + 1];
-    }
-    /* If not within the margin of an actual index, choose the index whose
-     * magnitude is furthest from the previously used magnitude */
-    else
-    {
-        uint16_t lower = vec[(int)index];
-        uint16_t upper = vec[(int)index+1];
-        int lower_diff = abs((int)lower - (int)prev_value);
-        int upper_diff = abs((int)upper - (int)prev_value);
-        if (upper_diff > lower_diff)
-        {
-            return vec[(int)index+1];
-        }
-        else
-        {
-            return vec[(int)index];
-        }
-    }
+    return vec[(int)(index+0.5)];
 }
-
 
 /* Return -1 if the message is out of fase left-side
  * Return  1 if the message is out of fase right-size
