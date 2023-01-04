@@ -144,7 +144,6 @@ struct {
     int enable_agc;
     rtlsdr_dev_t *dev;
     int freq;
-    int sample_rate;
 
     /* Networking */
     char aneterr[ANET_ERR_LEN];
@@ -264,7 +263,6 @@ void modesInitConfig(void) {
     Modes.dev_index = 0;
     Modes.enable_agc = 0;
     Modes.freq = MODES_DEFAULT_FREQ;
-    Modes.sample_rate = MODES_DEFAULT_RATE;
     Modes.filename = NULL;
     Modes.fix_errors = 1;
     Modes.check_crc = 1;
@@ -382,7 +380,7 @@ void modesInitRTLSDR(void) {
     rtlsdr_set_freq_correction(Modes.dev, ppm_error);
     if (Modes.enable_agc) rtlsdr_set_agc_mode(Modes.dev, 1);
     rtlsdr_set_center_freq(Modes.dev, Modes.freq);
-    rtlsdr_set_sample_rate(Modes.dev, Modes.sample_rate);
+    rtlsdr_set_sample_rate(Modes.dev, MODES_DEFAULT_RATE);
     rtlsdr_reset_buffer(Modes.dev);
     fprintf(stderr, "Gain reported by device: %.2f\n",
         rtlsdr_get_tuner_gain(Modes.dev)/10.0);
@@ -2485,7 +2483,6 @@ void showHelp(void) {
 "--gain <db>              Set gain (default: max gain. Use -100 for auto-gain).\n"
 "--enable-agc             Enable the Automatic Gain Control (default: off).\n"
 "--freq <hz>              Set frequency (default: 1090 Mhz).\n"
-"--sample-rate <hz>       Set sample rate (default/minimum): 2000000 samples/second).\n"
 "--ifile <filename>       Read data from file (use '-' for stdin).\n"
 "--loop                   With --ifile, read the same file in a loop.\n"
 "--interactive            Interactive mode refreshing data on screen.\n"
@@ -2557,11 +2554,6 @@ int main(int argc, char **argv) {
             Modes.enable_agc++;
         } else if (!strcmp(argv[j],"--freq") && more) {
             Modes.freq = strtoll(argv[++j],NULL,10);
-        } else if (!strcmp(argv[j],"--sample-rate") && more) {
-            Modes.sample_rate = strtoll(argv[++j],NULL,10);
-            if (Modes.sample_rate < MODES_DEFAULT_RATE) {
-                Modes.sample_rate = MODES_DEFAULT_RATE;
-            }
         } else if (!strcmp(argv[j],"--ifile") && more) {
             Modes.filename = strdup(argv[++j]);
         } else if (!strcmp(argv[j],"--loop")) {
