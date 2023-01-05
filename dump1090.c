@@ -45,6 +45,7 @@
 #include <sys/select.h>
 #include "rtl-sdr.h"
 #include "anet.h"
+#include <string>
 
 #define MODES_DEFAULT_RATE         2000000
 #define MODES_DEFAULT_FREQ         1090000000
@@ -292,12 +293,12 @@ void modesInit(void) {
     Modes.data_ready = 0;
     /* Allocate the ICAO address cache. We use two uint32_t for every
      * entry because it's a addr / timestamp pair for every entry. */
-    Modes.icao_cache = malloc(sizeof(uint32_t)*MODES_ICAO_CACHE_LEN*2);
+    Modes.icao_cache = (uint32_t*) malloc(sizeof(uint32_t)*MODES_ICAO_CACHE_LEN*2);
     memset(Modes.icao_cache,0,sizeof(uint32_t)*MODES_ICAO_CACHE_LEN*2);
     Modes.aircrafts = NULL;
     Modes.interactive_last_update = 0;
-    if ((Modes.data = malloc(Modes.data_len)) == NULL ||
-        (Modes.magnitude = malloc(Modes.data_len*2)) == NULL) {
+    if ((Modes.data = (unsigned char*) malloc(Modes.data_len)) == NULL ||
+        (Modes.magnitude = (uint16_t*) malloc(Modes.data_len*2)) == NULL) {
         fprintf(stderr, "Out of memory allocating data buffer.\n");
         exit(1);
     }
@@ -310,7 +311,7 @@ void modesInit(void) {
      * We scale to 0-255 range multiplying by 1.4 in order to ensure that
      * every different I/Q pair will result in a different magnitude value,
      * not losing any resolution. */
-    Modes.maglut = malloc(129*129*2);
+    Modes.maglut = (uint16_t*) malloc(129*129*2);
     for (i = 0; i <= 128; i++) {
         for (q = 0; q <= 128; q++) {
             Modes.maglut[i*129+q] = round(sqrt(i*i+q*q)*360);
@@ -493,7 +494,7 @@ void *readerThreadEntryPoint(void *arg) {
  * "." is 1
  */
 void dumpMagnitudeBar(int index, int magnitude) {
-    char *set = " .-o";
+    const char *set = " .-o";
     char buf[256];
     int div = magnitude / 256 / 4;
     int rem = magnitude / 256 % 4;
@@ -538,7 +539,7 @@ void dumpMagnitudeVector(uint16_t *m, uint32_t offset) {
 
 /* Produce a raw representation of the message as a Javascript file
  * loadable by debug.html. */
-void dumpRawMessageJS(char *descr, unsigned char *msg,
+void dumpRawMessageJS(const char *descr, unsigned char *msg,
                       uint16_t *m, uint32_t offset, int fixable)
 {
     int padding = 5; /* Show a few samples before the actual start. */
@@ -582,7 +583,7 @@ void dumpRawMessageJS(char *descr, unsigned char *msg,
  * display packets in a graphical format if the Javascript output was
  * enabled.
  */
-void dumpRawMessage(char *descr, unsigned char *msg,
+void dumpRawMessage(const char *descr, unsigned char *msg,
                     uint16_t *m, uint32_t offset)
 {
     int j;
@@ -886,7 +887,7 @@ int decodeAC12Field(unsigned char *msg, int *unit) {
 }
 
 /* Capability table. */
-char *ca_str[8] = {
+const char *ca_str[8] = {
     /* 0 */ "Level 1 (Survillance Only)",
     /* 1 */ "Level 2 (DF0,4,5,11)",
     /* 2 */ "Level 3 (DF0,4,5,11,20,21)",
@@ -898,7 +899,7 @@ char *ca_str[8] = {
 };
 
 /* Flight status table. */
-char *fs_str[8] = {
+const char *fs_str[8] = {
     /* 0 */ "Normal, Airborne",
     /* 1 */ "Normal, On the ground",
     /* 2 */ "ALERT,  Airborne",
@@ -913,8 +914,8 @@ char *fs_str[8] = {
 char *me_str[] = {
 };
 
-char *getMEDescription(int metype, int mesub) {
-    char *mename = "Unknown";
+std::string getMEDescription(int metype, int mesub) {
+    std::string mename = "Unknown";
 
     if (metype >= 1 && metype <= 4)
         mename = "Aircraft Identification and Category";
@@ -946,7 +947,7 @@ char *getMEDescription(int metype, int mesub) {
  * structure. */
 void decodeModesMessage(struct modesMessage *mm, unsigned char *msg) {
     uint32_t crc2;   /* Computed CRC, used to verify the message CRC. */
-    char *ais_charset = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????";
+    const char *ais_charset = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????";
 
     /* Work on our local copy */
     memcpy(mm->msg,msg,MODES_LONG_MSG_BYTES);
@@ -1196,12 +1197,12 @@ void displayModesMessage(struct modesMessage *mm) {
         printf("  Extended Squitter  Type: %d\n", mm->metype);
         printf("  Extended Squitter  Sub : %d\n", mm->mesub);
         printf("  Extended Squitter  Name: %s\n",
-            getMEDescription(mm->metype,mm->mesub));
+            getMEDescription(mm->metype,mm->mesub).c_str());
 
         /* Decode the extended squitter message. */
         if (mm->metype >= 1 && mm->metype <= 4) {
             /* Aircraft identification. */
-            char *ac_type_str[4] = {
+            const char *ac_type_str[4] = {
                 "Aircraft Type D",
                 "Aircraft Type C",
                 "Aircraft Type B",
@@ -1584,7 +1585,7 @@ void useModesMessage(struct modesMessage *mm) {
 /* Return a new aircraft structure for the interactive mode linked list
  * of aircrafts. */
 struct aircraft *interactiveCreateAircraft(uint32_t addr) {
-    struct aircraft *a = malloc(sizeof(*a));
+    struct aircraft *a = (struct aircraft*) malloc(sizeof(*a));
 
     a->addr = addr;
     snprintf(a->hexaddr,sizeof(a->hexaddr),"%06x",(int)addr);
@@ -1912,7 +1913,7 @@ void snipMode(int level) {
 #define MODES_NET_SERVICE_SBS 3
 #define MODES_NET_SERVICES_NUM 4
 struct {
-    char *descr;
+    const char *descr;
     int *socket;
     int port;
 } modesNetServices[MODES_NET_SERVICES_NUM] = {
@@ -1969,7 +1970,7 @@ void modesAcceptClients(void) {
         }
 
         anetNonBlock(Modes.aneterr, fd);
-        c = malloc(sizeof(*c));
+        c = (struct client*) malloc(sizeof(*c));
         c->service = *modesNetServices[j].socket;
         c->fd = fd;
         c->buflen = 0;
@@ -2156,7 +2157,7 @@ int decodeHexMessage(struct client *c) {
 char *aircraftsToJson(int *len) {
     struct aircraft *a = Modes.aircrafts;
     int buflen = 1024; /* The initial buffer is incremented as needed. */
-    char *buf = malloc(buflen), *p = buf;
+    char *buf = (char*) malloc(buflen), *p = buf;
     int l;
 
     l = snprintf(p,buflen,"[\n");
@@ -2182,7 +2183,7 @@ char *aircraftsToJson(int *len) {
             if (buflen < 256) {
                 int used = p-buf;
                 buflen += 1024; /* Our increment. */
-                buf = realloc(buf,used+buflen);
+                buf = (char*) realloc(buf,used+buflen);
                 p = buf+used;
             }
         }
@@ -2215,7 +2216,7 @@ int handleHTTPRequest(struct client *c) {
     int clen, hdrlen;
     int httpver, keepalive;
     char *p, *url, *content;
-    char *ctype;
+    std::string ctype;
 
     if (Modes.debug & MODES_DEBUG_NET)
         printf("\nHTTP request: %s\n", c->buf);
@@ -2256,7 +2257,7 @@ int handleHTTPRequest(struct client *c) {
         if (stat("gmap.html",&sbuf) != -1 &&
             (fd = open("gmap.html",O_RDONLY)) != -1)
         {
-            content = malloc(sbuf.st_size);
+            content = (char*) malloc(sbuf.st_size);
             if (read(fd,content,sbuf.st_size) == -1) {
                 snprintf(content,sbuf.st_size,"Error reading from file: %s",
                     strerror(errno));
@@ -2282,7 +2283,7 @@ int handleHTTPRequest(struct client *c) {
         "Content-Length: %d\r\n"
         "Access-Control-Allow-Origin: *\r\n"
         "\r\n",
-        ctype,
+        ctype.c_str(),
         keepalive ? "keep-alive" : "close",
         clen);
 
@@ -2313,7 +2314,7 @@ int handleHTTPRequest(struct client *c) {
  * The handelr returns 0 on success, or 1 to signal this function we
  * should close the connection with the client in case of non-recoverable
  * errors. */
-void modesReadFromClient(struct client *c, char *sep,
+void modesReadFromClient(struct client *c, const char *sep,
                          int(*handler)(struct client *))
 {
     while(1) {
@@ -2424,7 +2425,7 @@ void sigWinchCallback() {
     signal(SIGWINCH, SIG_IGN);
     Modes.interactive_rows = getTermRows();
     interactiveShowData();
-    signal(SIGWINCH, sigWinchCallback);
+    signal(SIGWINCH, (__sighandler_t) sigWinchCallback);
 }
 
 /* Get the number of rows after the terminal changes size. */
@@ -2584,7 +2585,7 @@ int main(int argc, char **argv) {
     }
 
     /* Setup for SIGWINCH for handling lines */
-    if (Modes.interactive == 1) signal(SIGWINCH, sigWinchCallback);
+    if (Modes.interactive == 1) signal(SIGWINCH, (__sighandler_t) sigWinchCallback);
 
     /* Initialization */
     modesInit();
