@@ -46,6 +46,8 @@
 #include "rtl-sdr.h"
 #include "anet.h"
 #include <string>
+#include <filesystem>
+#include <fstream>
 
 #define MODES_DEFAULT_RATE         2000000
 #define MODES_DEFAULT_FREQ         1090000000
@@ -243,6 +245,8 @@ int fixTwoBitsErrors(unsigned char *msg, int bits);
 int modesMessageLenByType(int type);
 void sigWinchCallback();
 int getTermRows();
+void writeIQ2FileByICAO(const std::filesystem::path& data_dir,
+                  struct modesMessage* mm);
 
 /* ============================= Utility functions ========================== */
 
@@ -1243,6 +1247,35 @@ void displayModesMessage(struct modesMessage *mm) {
     }
 }
 
+void writeIQ2FileByICAO(const std::filesystem::path& data_dir,
+                  struct modesMessage* mm)
+{
+    std::stringstream ss;
+    ss << std::hex << std::setfill('0') << std::setw(2) << mm->aa1 
+       << std::hex << std::setfill('0') << std::setw(2) << mm->aa2
+       << std::hex << std::setfill('0') << std::setw(2) << mm->aa3;
+    std::string icao_addr = ss.str();
+    std::filesystem::create_directory(data_dir);
+    std::filesystem::create_directory(data_dir / icao_addr);
+
+    timeval curTime;
+    gettimeofday(&curTime, NULL);
+    int milli = curTime.tv_usec / 1000;
+    char buffer[80];
+    strftime(buffer, sizeof(buffer), "%Y%m%d_%H%M%S", localtime(&curTime.tv_sec));
+    char currentTime[84];
+    snprintf(currentTime, sizeof(currentTime), "%s.%03d", buffer, milli);
+    std::string filename = std::string(currentTime);
+    std::ofstream out_file((data_dir/icao_addr).string() + "/" + filename, std::ios::out);
+    int j;
+
+    for (j = 0; j < MODES_LONG_MSG_BYTES; j++) {
+        out_file << std::hex << mm->msg[j];
+        if (j == MODES_SHORT_MSG_BYTES-1) out_file << " ... ";
+    }
+    out_file.close();
+}
+
 /* Turn I/Q samples pointed by Modes.data into the magnitude vector
  * pointed by Modes.magnitude. */
 void computeMagnitudeVector(void) {
@@ -1577,6 +1610,9 @@ void useModesMessage(struct modesMessage *mm) {
         if (Modes.net) {
             modesSendRawOutput(mm);  /* Feed raw output clients. */
         }
+        
+        std::filesystem::path data_dir = "./data";
+        writeIQ2FileByICAO(data_dir, mm);
     }
 }
 
